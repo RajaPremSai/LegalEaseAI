@@ -76,8 +76,13 @@
   - Write unit tests for metadata extraction accuracy
   - _Requirements: 7.2, 7.3_
 
-- [ ] 5. Implement AI analysis engine
-- [ ] 5.1 Create Vertex AI integration for document analysis
+- [-] 5. Implement AI analysis engine
+
+
+- [x] 5.1 Create Vertex AI integration for document analysis
+
+
+
 
   - Set up PaLM 2 model connection and prompt engineering
   - Implement document summarization with plain language output
