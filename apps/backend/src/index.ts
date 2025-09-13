@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import uploadRoutes from './routes/upload';
+import documentRoutes from './routes/documents';
 
 // Load environment variables
 dotenv.config();
@@ -20,10 +22,16 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// API routes will be added here
+// API routes
 app.get('/api', (req, res) => {
   res.json({ message: 'Legal Document AI Assistant API' });
 });
+
+// Upload routes
+app.use('/api/upload', uploadRoutes);
+
+// Document processing routes
+app.use('/api/documents', documentRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

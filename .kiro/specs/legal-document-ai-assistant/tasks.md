@@ -40,8 +40,15 @@
   - Write integration tests for Google Cloud services
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. Build document upload and processing pipeline
-- [ ] 4.1 Create secure file upload service
+- [x] 4. Build document upload and processing pipeline
+
+
+
+
+
+- [x] 4.1 Create secure file upload service
+
+
 
   - Implement multipart file upload with progress tracking
   - Add file type validation and size limits (50MB max)
@@ -49,7 +56,9 @@
   - Write unit tests for upload validation
   - _Requirements: 1.1, 8.2_
 
-- [ ] 4.2 Implement Document AI integration for text extraction
+- [x] 4.2 Implement Document AI integration for text extraction
+
+
 
   - Create service to process PDFs and documents using Google Document AI
   - Implement OCR fallback for scanned documents
@@ -57,7 +66,9 @@
   - Write integration tests with sample legal documents
   - _Requirements: 1.1, 1.2, 7.1_
 
-- [ ] 4.3 Build document metadata extraction
+- [x] 4.3 Build document metadata extraction
+
+
 
   - Implement document type classification using ML patterns
   - Create jurisdiction detection based on legal terminology
