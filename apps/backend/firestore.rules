@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isAuthenticated() && 
+             request.auth.token.email_verified == true;
+    }
+    
+    function isValidDocumentData() {
+      return request.resource.data.keys().hasAll(['userId', 'filename', 'uploadedAt', 'expiresAt']) &&
+             request.resource.data.userId == request.auth.uid &&
+             request.resource.data.uploadedAt is timestamp &&
+             request.resource.data.expiresAt is timestamp;
+    }
+    
+    function isValidAnalysisData() {
+      return request.resource.data.keys().hasAll(['documentId', 'userId', 'generatedAt']) &&
+             request.resource.data.userId == request.auth.uid &&
+             request.resource.data.generatedAt is timestamp;
+    }
+
+    // Users collection - users can only access their own data
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) && isValidUser();
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       request.resource.data.email == request.auth.token.email;
+    }
+
+    // Documents collection - users can only access their own documents
+    match /documents/{documentId} {
+      allow read, delete: if isAuthenticated() && 
+                             resource.data.userId == request.auth.uid;
+      
+      allow create: if isValidUser() && 
+                       isValidDocumentData() &&
+                       request.resource.data.expiresAt > request.time;
+      
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid;
+    }
+
+    // Analyses collection - users can only access analyses for their documents
+    match /analyses/{analysisId} {
+      allow read: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      
+      allow create: if isValidUser() && 
+                       isValidAnalysisData() &&
+                       exists(/databases/$(database)/documents/documents/$(request.resource.data.documentId)) &&
+                       get(/databases/$(database)/documents/documents/$(request.resource.data.documentId)).data.userId == request.auth.uid;
+      
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid;
+      
+      allow delete: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+    }
+
+    // Sessions collection - for managing user sessions and temporary data
+    match /sessions/{sessionId} {
+      allow read, write, delete: if isAuthenticated() && 
+                                    resource.data.userId == request.auth.uid;
+      
+      allow create: if isValidUser() && 
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.createdAt is timestamp &&
+                       request.resource.data.expiresAt is timestamp &&
+                       request.resource.data.expiresAt > request.time;
+    }
+
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
