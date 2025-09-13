@@ -279,4 +279,31 @@ export class FirestoreService {
   createBatch(): FirebaseFirestore.WriteBatch {
     return this.firestore.batch();
   }
+
+  // Array operations for Firestore
+  arrayUnion(...elements: any[]): FirebaseFirestore.FieldValue {
+    return this.firestore.FieldValue.arrayUnion(...elements);
+  }
+
+  arrayRemove(...elements: any[]): FirebaseFirestore.FieldValue {
+    return this.firestore.FieldValue.arrayRemove(...elements);
+  }
+
+  // Direct database access for Q&A service
+  get db(): Firestore {
+    return this.firestore;
+  }
 }
+
+// Default configuration
+const defaultConfig: FirestoreConfig = {
+  collections: {
+    users: 'users',
+    documents: 'documents',
+    analyses: 'analyses',
+    sessions: 'sessions'
+  }
+};
+
+// Export default instance
+export const firestoreService = new FirestoreService(defaultConfig);

@@ -90,7 +90,12 @@
   - Write unit tests for AI service integration
   - _Requirements: 1.2, 1.4, 2.1_
 
-- [ ] 5.2 Build risk assessment module
+- [x] 5.2 Build risk assessment module
+
+
+
+
+
 
   - Implement clause analysis for risk identification
   - Create risk scoring algorithm (Low/Medium/High)
@@ -99,7 +104,12 @@
   - Write unit tests for risk assessment accuracy
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 5.3 Implement question-answering system
+- [x] 5.3 Implement question-answering system
+
+
+
+
+
 
   - Create vector embeddings for document sections
   - Build semantic search using vector database

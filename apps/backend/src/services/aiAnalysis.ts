@@ -1,5 +1,6 @@
 import { PredictionServiceClient } from '@google-cloud/aiplatform';
 import { DocumentAnalysis, KeyTerm, Risk, Clause, TextLocation } from '@legal-ai/shared';
+import { RiskAssessmentService } from './riskAssessment';
 
 interface VertexAIConfig {
   projectId: string;
@@ -18,6 +19,7 @@ export class AIAnalysisService {
   private client: PredictionServiceClient;
   private config: VertexAIConfig;
   private prompts: AnalysisPrompts;
+  private riskAssessmentService: RiskAssessmentService;
 
   constructor() {
     if (!process.env.GOOGLE_CLOUD_PROJECT_ID) {
@@ -37,6 +39,8 @@ export class AIAnalysisService {
       riskAssessment: this.createRiskAssessmentPrompt(),
       clauseAnalysis: this.createClauseAnalysisPrompt()
     };
+
+    this.riskAssessmentService = new RiskAssessmentService();
   }
 
   /**
@@ -49,24 +53,31 @@ export class AIAnalysisService {
   ): Promise<DocumentAnalysis> {
     try {
       // Run analysis tasks in parallel for better performance
-      const [summary, keyTerms, risks, clauses] = await Promise.all([
+      const [summary, keyTerms, aiRisks, clauses] = await Promise.all([
         this.generateSummary(documentText, documentType, jurisdiction),
         this.extractKeyTerms(documentText, documentType),
         this.assessRisks(documentText, documentType, jurisdiction),
         this.analyzeClauses(documentText, documentType)
       ]);
 
-      // Calculate overall risk score based on individual risks
-      const riskScore = this.calculateOverallRiskScore(risks);
+      // Perform comprehensive risk assessment using the dedicated service
+      const riskAssessment = await this.riskAssessmentService.assessDocumentRisks(
+        documentText,
+        clauses,
+        documentType,
+        jurisdiction
+      );
 
-      // Generate recommendations based on risks
-      const recommendations = this.generateRecommendations(risks, documentType);
+      // Combine AI-generated risks with pattern-based risks, prioritizing the advanced assessment
+      const combinedRisks = this.combineRiskAssessments(aiRisks, riskAssessment.risks);
+      const riskScore = riskAssessment.overallRiskScore;
+      const recommendations = riskAssessment.recommendations;
 
       return {
         summary,
         riskScore,
         keyTerms,
-        risks,
+        risks: combinedRisks,
         recommendations,
         clauses,
         generatedAt: new Date()
@@ -434,6 +445,46 @@ Clause Analysis:`;
     }
 
     return recommendations;
+  }
+
+  /**
+   * Combines AI-generated risks with pattern-based risks from the risk assessment service
+   */
+  private combineRiskAssessments(aiRisks: Risk[], patternRisks: Risk[]): Risk[] {
+    const combinedRisks: Risk[] = [...patternRisks]; // Start with pattern-based risks (more reliable)
+    
+    // Add AI risks that don't duplicate pattern risks
+    for (const aiRisk of aiRisks) {
+      const isDuplicate = patternRisks.some(patternRisk => 
+        patternRisk.category === aiRisk.category &&
+        this.calculateRiskSimilarity(patternRisk.description, aiRisk.description) > 0.7
+      );
+      
+      if (!isDuplicate) {
+        combinedRisks.push(aiRisk);
+      }
+    }
+    
+    // Sort by severity (high first) and limit total risks
+    return combinedRisks
+      .sort((a, b) => {
+        const severityOrder = { high: 3, medium: 2, low: 1 };
+        return severityOrder[b.severity] - severityOrder[a.severity];
+      })
+      .slice(0, 15); // Limit to top 15 risks to avoid overwhelming users
+  }
+
+  /**
+   * Calculates similarity between two risk descriptions
+   */
+  private calculateRiskSimilarity(desc1: string, desc2: string): number {
+    const words1 = desc1.toLowerCase().split(/\s+/);
+    const words2 = desc2.toLowerCase().split(/\s+/);
+    
+    const commonWords = words1.filter(word => words2.includes(word) && word.length > 3);
+    const totalUniqueWords = new Set([...words1, ...words2]).size;
+    
+    return commonWords.length / Math.max(totalUniqueWords, 1);
   }
 
   /**

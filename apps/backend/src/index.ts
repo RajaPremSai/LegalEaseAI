@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import uploadRoutes from './routes/upload';
 import documentRoutes from './routes/documents';
+import qaRoutes from './routes/qa';
 
 // Load environment variables
 dotenv.config();
@@ -32,6 +33,9 @@ app.use('/api/upload', uploadRoutes);
 
 // Document processing routes
 app.use('/api/documents', documentRoutes);
+
+// Question & Answer routes
+app.use('/api/qa', qaRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
