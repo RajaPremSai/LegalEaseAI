@@ -12,7 +12,18 @@ import analysisRoutes from './routes/analysis';
 import templateRoutes from './routes/templates';
 import workspaceRoutes from './routes/workspaces';
 import bulkProcessingRoutes from './routes/bulkProcessing';
+import monitoringRoutes from './routes/monitoring';
 import { schedulerService } from './services/scheduler';
+import { 
+  sanitizeInput, 
+  xssProtection, 
+  securityHeaders, 
+  standardRateLimit,
+  requestSizeLimiter 
+} from './middleware/security';
+import { csrfTokenGenerator } from './middleware/csrf';
+import AuditLoggerService from './services/auditLogger';
+import MonitoringService from './services/monitoring';
 
 // Load environment variables
 dotenv.config();
@@ -20,11 +31,44 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(helmet());
-app.use(cors());
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://apis.google.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.google.com", "https://*.googleapis.com"],
+      frameAncestors: ["'none'"]
+    }
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
+app.use(securityHeaders);
+app.use(xssProtection);
+app.use(standardRateLimit);
+app.use(requestSizeLimiter('50mb'));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(sanitizeInput);
+app.use(csrfTokenGenerator);
+
+// Monitoring middleware
+app.use(MonitoringService.performanceMiddleware());
+app.use(MonitoringService.errorMiddleware());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -66,10 +110,26 @@ app.use('/api/workspaces', workspaceRoutes);
 // Bulk processing routes
 app.use('/api/bulk-processing', bulkProcessingRoutes);
 
+// Monitoring and analytics routes
+app.use('/api/monitoring', monitoringRoutes);
+
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  
+  // Log security-related errors
+  if (err.message.includes('CSRF') || err.message.includes('XSS') || err.message.includes('validation')) {
+    AuditLoggerService.logFailedRequest(req, err.message, { stack: err.stack });
+  }
+  
+  // Don't expose internal error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: isDevelopment ? err.message : 'Something went wrong!',
+    ...(isDevelopment && { stack: err.stack })
+  });
 });
 
 // 404 handler

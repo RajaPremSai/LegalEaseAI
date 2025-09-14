@@ -5,6 +5,8 @@ import { firestoreService } from '../services/firestore';
 import { authConfig } from '../config/environment';
 import { authMiddleware } from '../middleware/auth';
 import { validationMiddleware } from '../middleware/validation';
+import AuditLoggerService from '../services/auditLogger';
+import { strictRateLimit } from '../middleware/security';
 
 const router = Router();
 
@@ -43,11 +45,17 @@ const googleAuthSchema = z.object({
  * POST /auth/register
  * Register a new user
  */
-router.post('/register', validationMiddleware(registerSchema), async (req: Request, res: Response) => {
+router.post('/register', strictRateLimit, validationMiddleware(registerSchema), async (req: Request, res: Response) => {
   try {
     const userData = req.body;
     
     const result = await authService.registerUser(userData);
+    
+    // Log successful registration
+    AuditLoggerService.logAuth(req, 'register', true, {
+      userType: userData.userType,
+      jurisdiction: userData.jurisdiction
+    });
     
     res.status(201).json({
       success: true,
@@ -64,6 +72,12 @@ router.post('/register', validationMiddleware(registerSchema), async (req: Reque
     });
   } catch (error) {
     console.error('Registration error:', error);
+    
+    // Log failed registration
+    AuditLoggerService.logAuth(req, 'register', false, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      email: req.body.email
+    });
     
     if (error instanceof Error) {
       if (error.message === 'User already exists with this email') {
@@ -87,11 +101,17 @@ router.post('/register', validationMiddleware(registerSchema), async (req: Reque
  * POST /auth/login
  * Authenticate user login
  */
-router.post('/login', validationMiddleware(loginSchema), async (req: Request, res: Response) => {
+router.post('/login', strictRateLimit, validationMiddleware(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
     
     const result = await authService.loginUser(email, password);
+    
+    // Log successful login
+    AuditLoggerService.logAuth(req, 'login', true, {
+      method: 'password',
+      userType: result.user.profile.userType
+    });
     
     res.json({
       success: true,
@@ -108,6 +128,13 @@ router.post('/login', validationMiddleware(loginSchema), async (req: Request, re
     });
   } catch (error) {
     console.error('Login error:', error);
+    
+    // Log failed login
+    AuditLoggerService.logAuth(req, 'login', false, {
+      method: 'password',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      email: email
+    });
     
     if (error instanceof Error && error.message === 'Invalid email or password') {
       return res.status(401).json({
