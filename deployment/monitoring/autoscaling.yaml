@@ -1,0 +1,180 @@
+# Auto-scaling configuration for Cloud Run services
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: autoscaling-config
+data:
+  # Backend auto-scaling configuration
+  backend-config.yaml: |
+    service: legal-ai-backend
+    scaling:
+      minInstances: 1
+      maxInstances: 100
+      targetConcurrency: 80
+      targetCPUUtilization: 70
+      targetMemoryUtilization: 80
+    
+    # Custom metrics for scaling
+    customMetrics:
+      - name: request_latency
+        target: 500  # milliseconds
+        scaleUpThreshold: 800
+        scaleDownThreshold: 200
+      
+      - name: queue_length
+        target: 10
+        scaleUpThreshold: 20
+        scaleDownThreshold: 5
+      
+      - name: error_rate
+        target: 1  # percentage
+        scaleUpThreshold: 5
+        scaleDownThreshold: 0.5
+    
+    # Scaling policies
+    policies:
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        selectPolicy: Max
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+      
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        selectPolicy: Min
+        policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+  # Frontend auto-scaling configuration
+  frontend-config.yaml: |
+    service: legal-ai-frontend
+    scaling:
+      minInstances: 0
+      maxInstances: 50
+      targetConcurrency: 100
+      targetCPUUtilization: 60
+      targetMemoryUtilization: 70
+    
+    # Custom metrics for scaling
+    customMetrics:
+      - name: request_latency
+        target: 300  # milliseconds
+        scaleUpThreshold: 500
+        scaleDownThreshold: 150
+      
+      - name: active_connections
+        target: 80
+        scaleUpThreshold: 120
+        scaleDownThreshold: 40
+    
+    # Scaling policies
+    policies:
+      scaleUp:
+        stabilizationWindowSeconds: 30
+        selectPolicy: Max
+        policies:
+        - type: Percent
+          value: 200
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      
+      scaleDown:
+        stabilizationWindowSeconds: 600  # 10 minutes
+        selectPolicy: Min
+        policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+
+---
+# Monitoring configuration for auto-scaling
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    rule_files:
+      - "scaling_rules.yml"
+    
+    scrape_configs:
+      - job_name: 'legal-ai-backend'
+        static_configs:
+          - targets: ['legal-ai-backend:9090']
+        metrics_path: /metrics
+        scrape_interval: 10s
+      
+      - job_name: 'legal-ai-frontend'
+        static_configs:
+          - targets: ['legal-ai-frontend:9090']
+        metrics_path: /metrics
+        scrape_interval: 10s
+
+  scaling_rules.yml: |
+    groups:
+    - name: scaling_rules
+      rules:
+      # Backend scaling rules
+      - alert: BackendHighLatency
+        expr: avg(http_request_duration_seconds{service="legal-ai-backend"}) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+          action: scale_up
+        annotations:
+          summary: "Backend latency is high"
+          description: "Average request latency is {{ $value }}s"
+      
+      - alert: BackendHighCPU
+        expr: avg(cpu_usage_percent{service="legal-ai-backend"}) > 70
+        for: 2m
+        labels:
+          severity: warning
+          action: scale_up
+        annotations:
+          summary: "Backend CPU usage is high"
+          description: "CPU usage is {{ $value }}%"
+      
+      - alert: BackendHighMemory
+        expr: avg(memory_usage_percent{service="legal-ai-backend"}) > 80
+        for: 2m
+        labels:
+          severity: warning
+          action: scale_up
+        annotations:
+          summary: "Backend memory usage is high"
+          description: "Memory usage is {{ $value }}%"
+      
+      # Frontend scaling rules
+      - alert: FrontendHighLatency
+        expr: avg(http_request_duration_seconds{service="legal-ai-frontend"}) > 0.3
+        for: 1m
+        labels:
+          severity: warning
+          action: scale_up
+        annotations:
+          summary: "Frontend latency is high"
+          description: "Average request latency is {{ $value }}s"
+      
+      - alert: FrontendHighConnections
+        expr: sum(active_connections{service="legal-ai-frontend"}) > 120
+        for: 30s
+        labels:
+          severity: warning
+          action: scale_up
+        annotations:
+          summary: "Frontend has high number of active connections"
+          description: "Active connections: {{ $value }}"

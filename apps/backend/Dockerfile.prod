@@ -1,0 +1,63 @@
+# Multi-stage production Dockerfile for backend
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat curl
+WORKDIR /app
+
+# Copy package files
+COPY package.json turbo.json ./
+COPY apps/backend/package.json ./apps/backend/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install dependencies with exact versions for reproducible builds
+RUN npm ci --frozen-lockfile --only=production && npm cache clean --force
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Set production environment
+ENV NODE_ENV=production
+
+# Build the application
+RUN npm run build --filter=@legal-ai/backend
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Install curl for health checks
+RUN apk add --no-cache curl
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+# Copy built application
+COPY --from=builder --chown=nodejs:nodejs /app/apps/backend/dist ./apps/backend/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/shared/dist ./packages/shared/dist
+
+# Copy production node_modules
+COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
+
+# Copy package.json files for runtime
+COPY --chown=nodejs:nodejs package.json ./
+COPY --chown=nodejs:nodejs apps/backend/package.json ./apps/backend/
+
+USER nodejs
+
+EXPOSE 3001
+
+ENV PORT=3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
+CMD ["node", "apps/backend/dist/index.js"]

@@ -24,6 +24,17 @@ import {
 import { csrfTokenGenerator } from './middleware/csrf';
 import AuditLoggerService from './services/auditLogger';
 import MonitoringService from './services/monitoring';
+import {
+  compressionMiddleware,
+  timingMiddleware,
+  memoryMonitoringMiddleware,
+  cacheMiddleware,
+  deduplicationMiddleware,
+  connectionPoolMiddleware,
+  batchProcessingMiddleware,
+  metricsCollectionMiddleware,
+  performanceCollector,
+} from './middleware/performance';
 
 // Load environment variables
 dotenv.config();
@@ -57,6 +68,15 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
+// Performance middleware
+app.use(compressionMiddleware);
+app.use(timingMiddleware);
+app.use(memoryMonitoringMiddleware);
+app.use(connectionPoolMiddleware);
+app.use(metricsCollectionMiddleware);
+app.use(deduplicationMiddleware);
+app.use(batchProcessingMiddleware);
+
 app.use(securityHeaders);
 app.use(xssProtection);
 app.use(standardRateLimit);
@@ -70,9 +90,20 @@ app.use(csrfTokenGenerator);
 app.use(MonitoringService.performanceMiddleware());
 app.use(MonitoringService.errorMiddleware());
 
-// Health check endpoint
+// Health check endpoint with performance metrics
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+  const metrics = performanceCollector.getMetrics();
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    performance: metrics
+  });
+});
+
+// Performance metrics endpoint
+app.get('/api/metrics', (req, res) => {
+  const metrics = performanceCollector.getMetrics();
+  res.json(metrics);
 });
 
 // API routes
@@ -89,11 +120,11 @@ app.use('/api/privacy', privacyRoutes);
 // Upload routes
 app.use('/api/upload', uploadRoutes);
 
-// Document processing routes
-app.use('/api/documents', documentRoutes);
+// Document processing routes with caching
+app.use('/api/documents', cacheMiddleware(10 * 60 * 1000), documentRoutes); // 10 min cache
 
-// AI Analysis routes
-app.use('/api/analysis', analysisRoutes);
+// AI Analysis routes with caching
+app.use('/api/analysis', cacheMiddleware(30 * 60 * 1000), analysisRoutes); // 30 min cache
 
 // Question & Answer routes
 app.use('/api/qa', qaRoutes);
