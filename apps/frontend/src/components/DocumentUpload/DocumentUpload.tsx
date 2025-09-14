@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useTranslation } from 'next-i18next';
 import {
   Box,
   Paper,
@@ -43,6 +44,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   uploadProgress = 0,
   error,
 }) => {
+  const { t } = useTranslation('common');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [dragActive, setDragActive] = useState(false);
@@ -75,6 +77,19 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
       <Paper
         {...getRootProps()}
         elevation={dragActive || isDragActive ? 8 : 2}
+        component="section"
+        role="button"
+        tabIndex={isUploading ? -1 : 0}
+        aria-label={t('upload.title')}
+        aria-describedby="upload-instructions upload-formats"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            // Trigger file input click
+            const input = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
+            input?.click();
+          }
+        }}
         sx={{
           p: isMobile ? 2 : 4,
           textAlign: 'center',
@@ -93,9 +108,16 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
             borderColor: theme.palette.primary.main,
             backgroundColor: theme.palette.primary.light + '05',
           },
+          '&:focus-visible': {
+            outline: `3px solid ${theme.palette.primary.main}`,
+            outlineOffset: '2px',
+          },
         }}
       >
-        <input {...getInputProps()} />
+        <input 
+          {...getInputProps()} 
+          aria-describedby="upload-instructions upload-formats"
+        />
         
         <Box sx={{ mb: 2 }}>
           <CloudUploadIcon
@@ -115,20 +137,26 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           sx={{ fontWeight: 500 }}
         >
           {isDragActive
-            ? 'Drop your document here'
-            : 'Upload Legal Document'}
+            ? t('upload.dropHere')
+            : t('upload.title')}
         </Typography>
 
         <Typography
           variant="body2"
           color="text.secondary"
           sx={{ mb: 2, px: isMobile ? 0 : 2 }}
+          id="upload-instructions"
         >
-          Drag and drop your document here, or click to browse
+          {t('upload.dragDrop')}
         </Typography>
 
-        <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
-          Supported formats: PDF, DOC, DOCX, TXT (Max 50MB)
+        <Typography 
+          variant="caption" 
+          color="text.secondary" 
+          sx={{ mb: 2 }}
+          id="upload-formats"
+        >
+          {t('upload.supportedFormats')}
         </Typography>
 
         {!isDragActive && (
@@ -142,14 +170,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
               startIcon={<DescriptionIcon />}
               disabled={isUploading}
             >
-              Choose File
+              {t('upload.chooseFile')}
             </Button>
             
             {isMobile && (
               <>
                 <Divider sx={{ width: '100%' }}>
                   <Typography variant="caption" color="text.secondary">
-                    OR
+                    {t('upload.or')}
                   </Typography>
                 </Divider>
                 
@@ -163,14 +191,15 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
         )}
 
         {isUploading && (
-          <Box sx={{ mt: 2 }}>
+          <Box sx={{ mt: 2 }} role="status" aria-live="polite">
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Uploading document...
+              {t('upload.uploading')}
             </Typography>
             <LinearProgress
               variant="determinate"
               value={uploadProgress}
               sx={{ mt: 1, borderRadius: 1 }}
+              aria-label={`Upload progress: ${Math.round(uploadProgress)}%`}
             />
             <Typography variant="caption" color="text.secondary">
               {Math.round(uploadProgress)}%
@@ -185,7 +214,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
           icon={<ErrorIcon />}
           sx={{ mt: 2 }}
         >
-          {error || fileError?.message || 'Upload failed. Please try again.'}
+          {error || fileError?.message || t('upload.uploadFailed')}
         </Alert>
       )}
     </Box>

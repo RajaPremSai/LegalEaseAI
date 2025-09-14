@@ -133,9 +133,12 @@ const withPWA = require('next-pwa')({
   ]
 });
 
+const { i18n } = require('./next-i18next.config');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@legal-ai/shared'],
+  i18n,
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   },
