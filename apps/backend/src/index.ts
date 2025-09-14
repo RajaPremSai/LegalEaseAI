@@ -9,6 +9,9 @@ import documentRoutes from './routes/documents';
 import qaRoutes from './routes/qa';
 import documentVersionRoutes from './routes/documentVersions';
 import analysisRoutes from './routes/analysis';
+import templateRoutes from './routes/templates';
+import workspaceRoutes from './routes/workspaces';
+import bulkProcessingRoutes from './routes/bulkProcessing';
 import { schedulerService } from './services/scheduler';
 
 // Load environment variables
@@ -53,6 +56,15 @@ app.use('/api/qa', qaRoutes);
 
 // Document versioning and comparison routes
 app.use('/api/document-versions', documentVersionRoutes);
+
+// Template library routes
+app.use('/api/templates', templateRoutes);
+
+// Workspace routes
+app.use('/api/workspaces', workspaceRoutes);
+
+// Bulk processing routes
+app.use('/api/bulk-processing', bulkProcessingRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

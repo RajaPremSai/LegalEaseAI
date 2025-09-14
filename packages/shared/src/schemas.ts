@@ -199,3 +199,353 @@ export type SignificantChange = z.infer<typeof SignificantChangeSchema>;
 export type ImpactAnalysis = z.infer<typeof ImpactAnalysisSchema>;
 export type DocumentComparison = z.infer<typeof DocumentComparisonSchema>;
 export type DocumentComparisonRequest = z.infer<typeof DocumentComparisonRequestSchema>;
+
+// Template library schemas
+export const CustomizationOptionSchema = z.object({
+  id: z.string().uuid(),
+  fieldName: z.string().min(1).max(100),
+  fieldType: z.enum(['text', 'number', 'date', 'select', 'multiselect', 'boolean']),
+  label: z.string().min(1).max(200),
+  description: z.string().min(1).max(500),
+  required: z.boolean(),
+  defaultValue: z.any().optional(),
+  options: z.array(z.string()).optional(),
+  validation: z.object({
+    minLength: z.number().min(0).optional(),
+    maxLength: z.number().min(1).optional(),
+    pattern: z.string().optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+  }).optional(),
+});
+
+export const TemplateAnnotationSchema = z.object({
+  id: z.string().uuid(),
+  location: TextLocationSchema,
+  type: z.enum(['explanation', 'warning', 'customization', 'alternative']),
+  title: z.string().min(1).max(200),
+  content: z.string().min(1).max(1000),
+  importance: z.enum(['high', 'medium', 'low']),
+});
+
+export const ClauseAlternativeSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  content: z.string().min(1),
+  description: z.string().min(1).max(500),
+  favorability: z.enum(['favorable', 'neutral', 'unfavorable']),
+  useCase: z.string().min(1).max(300),
+});
+
+export const StandardClauseSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  content: z.string().min(1),
+  category: z.enum(['payment', 'termination', 'liability', 'intellectual_property', 'confidentiality', 'dispute_resolution', 'other']),
+  isRequired: z.boolean(),
+  alternatives: z.array(ClauseAlternativeSchema),
+  explanation: z.string().min(1).max(1000),
+  riskLevel: z.enum(['low', 'medium', 'high']),
+});
+
+export const DocumentTemplateSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(200),
+  description: z.string().min(1).max(1000),
+  category: z.enum(['contract', 'lease', 'terms_of_service', 'privacy_policy', 'loan_agreement', 'employment', 'nda', 'other']),
+  industry: z.array(z.string().min(1).max(100)),
+  jurisdiction: z.array(z.string().min(2).max(10)),
+  templateContent: z.string().min(1),
+  annotations: z.array(TemplateAnnotationSchema),
+  standardClauses: z.array(StandardClauseSchema),
+  customizationOptions: z.array(CustomizationOptionSchema),
+  version: z.string().min(1).max(20),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  isActive: z.boolean(),
+  usage: z.object({
+    downloadCount: z.number().min(0),
+    rating: z.number().min(0).max(5),
+    reviewCount: z.number().min(0),
+  }),
+});
+
+export const MissingClauseSchema = z.object({
+  clauseId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  importance: z.enum(['critical', 'recommended', 'optional']),
+  description: z.string().min(1).max(500),
+  suggestedContent: z.string().min(1),
+});
+
+export const TemplateDeviationSchema = z.object({
+  location: TextLocationSchema,
+  templateClause: z.string().min(1),
+  userClause: z.string().min(1),
+  deviationType: z.enum(['missing', 'modified', 'additional']),
+  severity: z.enum(['high', 'medium', 'low']),
+  explanation: z.string().min(1).max(500),
+  recommendation: z.string().min(1).max(500),
+});
+
+export const TemplateComparisonSchema = z.object({
+  templateId: z.string().uuid(),
+  userDocumentId: z.string().uuid(),
+  comparisonResult: z.object({
+    overallCompliance: z.number().min(0).max(100),
+    missingClauses: z.array(MissingClauseSchema),
+    deviations: z.array(TemplateDeviationSchema),
+    recommendations: z.array(z.string().min(1).max(500)),
+    riskAssessment: z.object({
+      increasedrisk: z.boolean(),
+      riskFactors: z.array(z.string().min(1).max(200)),
+    }),
+  }),
+  generatedAt: z.date(),
+});
+
+// API request schemas for templates
+export const TemplateSearchSchema = z.object({
+  category: z.enum(['contract', 'lease', 'terms_of_service', 'privacy_policy', 'loan_agreement', 'employment', 'nda', 'other']).optional(),
+  industry: z.string().min(1).max(100).optional(),
+  jurisdiction: z.string().min(2).max(10).optional(),
+  query: z.string().min(1).max(200).optional(),
+  limit: z.number().min(1).max(50).default(20),
+  offset: z.number().min(0).default(0),
+});
+
+export const TemplateCustomizationSchema = z.object({
+  templateId: z.string().uuid(),
+  customizations: z.record(z.string(), z.any()),
+});
+
+export const TemplateComparisonRequestSchema = z.object({
+  templateId: z.string().uuid(),
+  documentId: z.string().uuid(),
+});
+
+// Inferred types for templates
+export type CustomizationOption = z.infer<typeof CustomizationOptionSchema>;
+export type TemplateAnnotation = z.infer<typeof TemplateAnnotationSchema>;
+export type ClauseAlternative = z.infer<typeof ClauseAlternativeSchema>;
+export type StandardClause = z.infer<typeof StandardClauseSchema>;
+export type DocumentTemplate = z.infer<typeof DocumentTemplateSchema>;
+export type MissingClause = z.infer<typeof MissingClauseSchema>;
+export type TemplateDeviation = z.infer<typeof TemplateDeviationSchema>;
+export type TemplateComparison = z.infer<typeof TemplateComparisonSchema>;
+export type TemplateSearch = z.infer<typeof TemplateSearchSchema>;
+export type TemplateCustomization = z.infer<typeof TemplateCustomizationSchema>;
+export type TemplateComparisonRequest = z.infer<typeof TemplateComparisonRequestSchema>;
+
+// Business user and workspace schemas
+export const WorkspaceSettingsSchema = z.object({
+  allowDocumentSharing: z.boolean().default(true),
+  requireApprovalForSharing: z.boolean().default(false),
+  defaultDocumentRetention: z.number().min(1).max(365).default(30),
+  allowBulkProcessing: z.boolean().default(true),
+  maxBulkDocuments: z.number().min(1).max(1000).default(50),
+  allowExternalSharing: z.boolean().default(false),
+  auditLogging: z.boolean().default(true),
+});
+
+export const WorkspaceSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).default(''),
+  ownerId: z.string().uuid(),
+  plan: z.enum(['small_business', 'enterprise']),
+  settings: WorkspaceSettingsSchema,
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  isActive: z.boolean().default(true),
+  memberCount: z.number().min(0),
+  documentCount: z.number().min(0),
+  storageUsed: z.number().min(0),
+  storageLimit: z.number().min(0),
+});
+
+export const WorkspacePermissionsSchema = z.object({
+  canUploadDocuments: z.boolean().default(true),
+  canViewAllDocuments: z.boolean().default(false),
+  canShareDocuments: z.boolean().default(true),
+  canDeleteDocuments: z.boolean().default(false),
+  canInviteMembers: z.boolean().default(false),
+  canManageWorkspace: z.boolean().default(false),
+  canUseBulkProcessing: z.boolean().default(false),
+  canExportData: z.boolean().default(false),
+});
+
+export const WorkspaceMemberSchema = z.object({
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  userId: z.string().uuid(),
+  role: z.enum(['owner', 'admin', 'member', 'viewer']),
+  permissions: WorkspacePermissionsSchema,
+  invitedBy: z.string().uuid(),
+  invitedAt: z.date(),
+  joinedAt: z.date().optional(),
+  status: z.enum(['pending', 'active', 'suspended']),
+});
+
+export const SharePermissionsSchema = z.object({
+  canView: z.boolean().default(true),
+  canComment: z.boolean().default(false),
+  canDownload: z.boolean().default(false),
+  canShare: z.boolean().default(false),
+});
+
+export const DocumentShareSchema = z.object({
+  id: z.string().uuid(),
+  documentId: z.string().uuid(),
+  sharedBy: z.string().uuid(),
+  sharedWith: z.array(z.string()),
+  workspaceId: z.string().uuid().optional(),
+  shareType: z.enum(['internal', 'external', 'public']),
+  permissions: SharePermissionsSchema,
+  expiresAt: z.date().optional(),
+  createdAt: z.date(),
+  accessCount: z.number().min(0),
+  lastAccessedAt: z.date().optional(),
+});
+
+export const BulkDocumentSchema = z.object({
+  id: z.string().uuid(),
+  filename: z.string().min(1).max(255),
+  size: z.number().min(1),
+  status: z.enum(['pending', 'processing', 'completed', 'failed']),
+  documentId: z.string().uuid().optional(),
+  error: z.string().optional(),
+});
+
+export const BulkProcessingSettingsSchema = z.object({
+  analysisType: z.enum(['full', 'summary', 'risk_only']).default('full'),
+  templateComparison: z.object({
+    enabled: z.boolean(),
+    templateId: z.string().uuid().optional(),
+  }).optional(),
+  outputFormat: z.enum(['individual', 'consolidated', 'both']).default('individual'),
+  notifyOnCompletion: z.boolean().default(true),
+  retentionDays: z.number().min(1).max(365).optional(),
+});
+
+export const BulkDocumentResultSchema = z.object({
+  documentId: z.string().uuid(),
+  filename: z.string(),
+  status: z.enum(['success', 'failed']),
+  analysis: DocumentAnalysisSchema.optional(),
+  templateComparison: TemplateComparisonSchema.optional(),
+  error: z.string().optional(),
+  processingTime: z.number().min(0),
+});
+
+export const BulkProcessingResultsSchema = z.object({
+  summary: z.object({
+    totalDocuments: z.number().min(0),
+    successfullyProcessed: z.number().min(0),
+    failed: z.number().min(0),
+    averageRiskScore: z.number().min(0).max(100),
+    highRiskDocuments: z.number().min(0),
+  }),
+  documents: z.array(BulkDocumentResultSchema),
+  consolidatedReport: z.string().optional(),
+});
+
+export const BulkProcessingJobSchema = z.object({
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  userId: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  documents: z.array(BulkDocumentSchema),
+  status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled']),
+  progress: z.object({
+    total: z.number().min(0),
+    processed: z.number().min(0),
+    successful: z.number().min(0),
+    failed: z.number().min(0),
+  }),
+  settings: BulkProcessingSettingsSchema,
+  results: BulkProcessingResultsSchema.optional(),
+  createdAt: z.date(),
+  startedAt: z.date().optional(),
+  completedAt: z.date().optional(),
+  error: z.string().optional(),
+});
+
+export const WorkspaceInvitationSchema = z.object({
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  email: z.string().email(),
+  role: z.enum(['owner', 'admin', 'member', 'viewer']),
+  permissions: WorkspacePermissionsSchema,
+  invitedBy: z.string().uuid(),
+  invitedAt: z.date(),
+  expiresAt: z.date(),
+  status: z.enum(['pending', 'accepted', 'declined', 'expired']),
+  token: z.string(),
+});
+
+export const WorkspaceActivitySchema = z.object({
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  userId: z.string().uuid(),
+  action: z.enum(['document_uploaded', 'document_shared', 'member_invited', 'member_joined', 'bulk_job_started', 'bulk_job_completed', 'settings_changed']),
+  details: z.record(z.any()),
+  timestamp: z.date(),
+  ipAddress: z.string().optional(),
+  userAgent: z.string().optional(),
+});
+
+// API request schemas for business features
+export const CreateWorkspaceSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  plan: z.enum(['small_business', 'enterprise']),
+  settings: WorkspaceSettingsSchema.partial().optional(),
+});
+
+export const UpdateWorkspaceSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  settings: WorkspaceSettingsSchema.partial().optional(),
+});
+
+export const InviteMemberSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['admin', 'member', 'viewer']),
+  permissions: WorkspacePermissionsSchema.partial().optional(),
+});
+
+export const ShareDocumentSchema = z.object({
+  documentId: z.string().uuid(),
+  sharedWith: z.array(z.string().email()),
+  shareType: z.enum(['internal', 'external']),
+  permissions: SharePermissionsSchema.partial().optional(),
+  expiresAt: z.date().optional(),
+});
+
+export const CreateBulkJobSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  settings: BulkProcessingSettingsSchema.partial().optional(),
+});
+
+// Inferred types for business features
+export type WorkspaceSettings = z.infer<typeof WorkspaceSettingsSchema>;
+export type Workspace = z.infer<typeof WorkspaceSchema>;
+export type WorkspacePermissions = z.infer<typeof WorkspacePermissionsSchema>;
+export type WorkspaceMember = z.infer<typeof WorkspaceMemberSchema>;
+export type SharePermissions = z.infer<typeof SharePermissionsSchema>;
+export type DocumentShare = z.infer<typeof DocumentShareSchema>;
+export type BulkDocument = z.infer<typeof BulkDocumentSchema>;
+export type BulkProcessingSettings = z.infer<typeof BulkProcessingSettingsSchema>;
+export type BulkDocumentResult = z.infer<typeof BulkDocumentResultSchema>;
+export type BulkProcessingResults = z.infer<typeof BulkProcessingResultsSchema>;
+export type BulkProcessingJob = z.infer<typeof BulkProcessingJobSchema>;
+export type WorkspaceInvitation = z.infer<typeof WorkspaceInvitationSchema>;
+export type WorkspaceActivity = z.infer<typeof WorkspaceActivitySchema>;
+export type CreateWorkspace = z.infer<typeof CreateWorkspaceSchema>;
+export type UpdateWorkspace = z.infer<typeof UpdateWorkspaceSchema>;
+export type InviteMember = z.infer<typeof InviteMemberSchema>;
+export type ShareDocument = z.infer<typeof ShareDocumentSchema>;
+export type CreateBulkJob = z.infer<typeof CreateBulkJobSchema>;
