@@ -2,11 +2,14 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { Request, Response, NextFunction } from 'express';
 import { FirestoreService, UserDocument } from './firestore';
+import { OAuth2Client } from 'google-auth-library';
 
 export interface AuthConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
   bcryptRounds: number;
+  googleClientId?: string;
+  googleClientSecret?: string;
 }
 
 export interface AuthUser {
@@ -34,10 +37,19 @@ declare global {
 export class AuthService {
   private config: AuthConfig;
   private firestoreService: FirestoreService;
+  private googleClient?: OAuth2Client;
 
   constructor(config: AuthConfig, firestoreService: FirestoreService) {
     this.config = config;
     this.firestoreService = firestoreService;
+    
+    // Initialize Google OAuth client if credentials are provided
+    if (config.googleClientId) {
+      this.googleClient = new OAuth2Client(
+        config.googleClientId,
+        config.googleClientSecret
+      );
+    }
   }
 
   /**
@@ -272,5 +284,173 @@ export class AuthService {
     // In a production system, you'd maintain a blacklist of revoked tokens
     // or use a token store like Redis with expiration
     console.log(`Token revoked: ${token.substring(0, 20)}...`);
+  }
+
+  /**
+   * Authenticate with Google OAuth
+   */
+  async authenticateWithGoogle(idToken: string): Promise<{ user: UserDocument; token: string; isNewUser: boolean }> {
+    if (!this.googleClient) {
+      throw new Error('Google OAuth not configured');
+    }
+
+    try {
+      // Verify the Google ID token
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: this.config.googleClientId,
+      });
+
+      const payload = ticket.getPayload();
+      if (!payload || !payload.email) {
+        throw new Error('Invalid Google token payload');
+      }
+
+      const { email, name, sub: googleId } = payload;
+
+      // Check if user already exists
+      let user = await this.firestoreService.getUserByEmail(email);
+      let isNewUser = false;
+
+      if (!user) {
+        // Create new user from Google profile
+        const userId = await this.firestoreService.createUser({
+          email,
+          profile: {
+            name: name || email.split('@')[0],
+            userType: 'individual',
+            jurisdiction: 'US', // Default, user can update later
+            preferences: {
+              language: 'en',
+              notifications: true,
+              autoDelete: true,
+              googleId,
+            },
+          },
+          subscription: {
+            plan: 'free',
+            documentsRemaining: 5,
+            renewsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        });
+
+        user = await this.firestoreService.getUser(userId);
+        if (!user) {
+          throw new Error('Failed to create user');
+        }
+        isNewUser = true;
+      } else {
+        // Update Google ID if not already set
+        if (!user.profile.preferences?.googleId) {
+          await this.firestoreService.updateUser(user.id, {
+            'profile.preferences.googleId': googleId,
+          });
+        }
+      }
+
+      // Generate JWT token
+      const token = this.generateToken({
+        id: user.id,
+        email: user.email,
+        userType: user.profile.userType,
+      });
+
+      return { user, token, isNewUser };
+    } catch (error) {
+      console.error('Google authentication error:', error);
+      throw new Error('Google authentication failed');
+    }
+  }
+
+  /**
+   * Update user subscription
+   */
+  async updateSubscription(
+    userId: string,
+    subscription: {
+      plan: 'free' | 'premium' | 'enterprise';
+      documentsRemaining?: number;
+      renewsAt?: Date;
+    }
+  ): Promise<void> {
+    const updateData: any = {};
+    
+    if (subscription.plan) {
+      updateData['subscription.plan'] = subscription.plan;
+    }
+    
+    if (subscription.documentsRemaining !== undefined) {
+      updateData['subscription.documentsRemaining'] = subscription.documentsRemaining;
+    }
+    
+    if (subscription.renewsAt) {
+      updateData['subscription.renewsAt'] = subscription.renewsAt;
+    }
+
+    await this.firestoreService.updateUser(userId, updateData);
+  }
+
+  /**
+   * Decrement user document quota
+   */
+  async decrementDocumentQuota(userId: string): Promise<void> {
+    const user = await this.firestoreService.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (user.subscription.documentsRemaining <= 0) {
+      throw new Error('Document quota exceeded');
+    }
+
+    await this.firestoreService.updateUser(userId, {
+      'subscription.documentsRemaining': user.subscription.documentsRemaining - 1,
+    });
+  }
+
+  /**
+   * Check if user has document quota remaining
+   */
+  async hasDocumentQuota(userId: string): Promise<boolean> {
+    const user = await this.firestoreService.getUser(userId);
+    if (!user) {
+      return false;
+    }
+
+    return user.subscription.documentsRemaining > 0;
+  }
+
+  /**
+   * Get user usage statistics
+   */
+  async getUserUsage(userId: string): Promise<{
+    documentsProcessed: number;
+    documentsRemaining: number;
+    plan: string;
+    renewsAt: Date;
+  }> {
+    const user = await this.firestoreService.getUser(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Calculate documents processed based on plan limits
+    const planLimits = {
+      free: 5,
+      premium: 100,
+      enterprise: -1, // Unlimited
+    };
+
+    const planLimit = planLimits[user.subscription.plan];
+    const documentsProcessed = planLimit === -1 
+      ? 0 // For unlimited plans, we don't track processed count
+      : Math.max(0, planLimit - user.subscription.documentsRemaining);
+
+    return {
+      documentsProcessed,
+      documentsRemaining: user.subscription.documentsRemaining,
+      plan: user.subscription.plan,
+      renewsAt: user.subscription.renewsAt,
+    };
   }
 }

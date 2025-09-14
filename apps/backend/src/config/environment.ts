@@ -26,6 +26,8 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT secret must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('24h'),
   BCRYPT_ROUNDS: z.string().transform(Number).default('12'),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
   
   // Database configuration
   DATABASE_URL: z.string().optional(),
@@ -94,6 +96,8 @@ export const authConfig = {
   jwtSecret: env.JWT_SECRET,
   jwtExpiresIn: env.JWT_EXPIRES_IN,
   bcryptRounds: env.BCRYPT_ROUNDS,
+  googleClientId: env.GOOGLE_CLIENT_ID,
+  googleClientSecret: env.GOOGLE_CLIENT_SECRET,
 };
 
 export const firestoreConfig = {
