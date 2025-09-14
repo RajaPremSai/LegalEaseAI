@@ -8,6 +8,7 @@ import uploadRoutes from './routes/upload';
 import documentRoutes from './routes/documents';
 import qaRoutes from './routes/qa';
 import documentVersionRoutes from './routes/documentVersions';
+import analysisRoutes from './routes/analysis';
 import { schedulerService } from './services/scheduler';
 
 // Load environment variables
@@ -43,6 +44,9 @@ app.use('/api/upload', uploadRoutes);
 
 // Document processing routes
 app.use('/api/documents', documentRoutes);
+
+// AI Analysis routes
+app.use('/api/analysis', analysisRoutes);
 
 // Question & Answer routes
 app.use('/api/qa', qaRoutes);

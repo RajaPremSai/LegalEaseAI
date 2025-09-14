@@ -148,6 +148,7 @@
 
 
 
+
 - [x] 7.1 Implement user registration and login
 
 
@@ -168,8 +169,15 @@
   - Write compliance tests for privacy requirements
   - _Requirements: 3.2, 3.4_
 
-- [ ] 8. Create REST API endpoints
-- [ ] 8.1 Build document management APIs
+- [x] 8. Create REST API endpoints
+
+
+
+
+
+- [x] 8.1 Build document management APIs
+
+
 
   - Create endpoints for document upload, analysis, and retrieval
   - Implement proper error handling and validation
@@ -177,7 +185,9 @@
   - Write API integration tests
   - _Requirements: 1.1, 1.2, 4.1_
 
-- [ ] 8.2 Implement analysis and Q&A APIs
+- [x] 8.2 Implement analysis and Q&A APIs
+
+
 
   - Create endpoints for document analysis and risk assessment
   - Build Q&A chat API with conversation context

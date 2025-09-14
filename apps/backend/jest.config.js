@@ -26,9 +26,9 @@ module.exports = {
   testTimeout: 30000,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   transformIgnorePatterns: [
-    'node_modules/(?!(uuid)/)'
+    'node_modules/(?!(uuid|@google-cloud)/)'
   ],
   moduleNameMapper: {
-    '^uuid$': require.resolve('uuid'),
+    '^uuid$': '<rootDir>/node_modules/uuid/dist/index.js',
   },
 };

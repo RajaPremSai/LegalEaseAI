@@ -4,10 +4,17 @@ import { DocumentComparisonService } from '../services/documentComparison';
 import { DocumentVersionRepository } from '../database/repositories/documentVersionRepository';
 import { getDatabase } from '../database/connection';
 import { DocumentComparisonRequestSchema } from '@legal-ai/shared';
-import { authMiddleware } from '../middleware/auth';
-import { validateRequest } from '../middleware/validation';
+import { authMiddleware, AuthenticatedRequest } from '../middleware/auth';
+import { rateLimitMiddleware } from '../middleware/rateLimit';
+import { validateRequest, validateParams, validateQuery } from '../middleware/validation';
+import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
+
+// Apply authentication and rate limiting
+router.use(authMiddleware);
+router.use(rateLimitMiddleware);
 
 // Initialize services
 const db = getDatabase();
@@ -15,24 +22,90 @@ const versionRepository = new DocumentVersionRepository(db);
 const comparisonService = new DocumentComparisonService();
 const versioningService = new DocumentVersioningService(versionRepository, comparisonService);
 
+// Validation schemas
+const DocumentIdParamsSchema = z.object({
+  documentId: z.string().uuid('Invalid document ID format'),
+});
+
+const VersionIdParamsSchema = z.object({
+  versionId: z.string().uuid('Invalid version ID format'),
+});
+
+const ComparisonIdParamsSchema = z.object({
+  comparisonId: z.string().uuid('Invalid comparison ID format'),
+});
+
+const VersionHistoryQuerySchema = z.object({
+  limit: z.string().transform(val => parseInt(val)).pipe(z.number().min(1).max(50)).optional().default('10'),
+  offset: z.string().transform(val => parseInt(val)).pipe(z.number().min(0)).optional().default('0'),
+  includeAnalysis: z.string().transform(val => val === 'true').optional().default('false'),
+});
+
+const CreateVersionSchema = z.object({
+  filename: z.string().min(1).max(255),
+  metadata: z.object({
+    pageCount: z.number().min(1),
+    wordCount: z.number().min(0),
+    language: z.string().min(2).max(10),
+    extractedText: z.string(),
+  }),
+  analysis: z.any().optional(),
+  parentVersionId: z.string().uuid().optional(),
+});
+
+const RollbackSchema = z.object({
+  filename: z.string().min(1).max(255),
+  reason: z.string().max(500).optional(),
+});
+
+const CleanupQuerySchema = z.object({
+  retentionDays: z.string().transform(val => parseInt(val)).pipe(z.number().min(1).max(365)).optional().default('30'),
+});
+
 /**
  * Get version history for a document
  */
-router.get('/:documentId/history', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:documentId/history', 
+  validateParams(DocumentIdParamsSchema),
+  validateQuery(VersionHistoryQuerySchema),
+  async (req: Request, res: Response) => {
   try {
     const { documentId } = req.params;
+    const { limit, offset, includeAnalysis } = req.query as any;
+    const userId = (req as AuthenticatedRequest).user.id;
     
-    const history = await versioningService.getVersionHistory(documentId);
+    const history = await versioningService.getVersionHistory(documentId, {
+      limit,
+      offset,
+      includeAnalysis,
+      userId,
+    });
     
     res.json({
       success: true,
-      data: history,
+      data: {
+        documentId,
+        versions: history.versions,
+        pagination: {
+          limit,
+          offset,
+          total: history.total,
+          hasMore: offset + limit < history.total,
+        },
+        summary: {
+          totalVersions: history.total,
+          latestVersion: history.latestVersion,
+          firstVersion: history.firstVersion,
+          totalComparisons: history.totalComparisons,
+        },
+      },
     });
   } catch (error) {
     console.error('Error getting version history:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve version history',
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
     });
   }
 });
@@ -40,16 +113,20 @@ router.get('/:documentId/history', authMiddleware, async (req: Request, res: Res
 /**
  * Get a specific version
  */
-router.get('/version/:versionId', authMiddleware, async (req: Request, res: Response) => {
+router.get('/version/:versionId', 
+  validateParams(VersionIdParamsSchema),
+  async (req: Request, res: Response) => {
   try {
     const { versionId } = req.params;
+    const userId = (req as AuthenticatedRequest).user.id;
     
-    const version = await versioningService.getVersion(versionId);
+    const version = await versioningService.getVersion(versionId, userId);
     
     if (!version) {
       return res.status(404).json({
         success: false,
         error: 'Version not found',
+        message: 'The specified version does not exist or you do not have access to it',
       });
     }
     
@@ -62,6 +139,7 @@ router.get('/version/:versionId', authMiddleware, async (req: Request, res: Resp
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve version',
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
     });
   }
 });
@@ -99,26 +177,43 @@ router.get('/:documentId/latest', authMiddleware, async (req: Request, res: Resp
  * Compare two document versions
  */
 router.post('/compare', 
-  authMiddleware, 
   validateRequest(DocumentComparisonRequestSchema),
   async (req: Request, res: Response) => {
     try {
       const { originalVersionId, comparedVersionId } = req.body;
+      const userId = (req as AuthenticatedRequest).user.id;
       
       const comparison = await versioningService.compareVersions(
         originalVersionId,
-        comparedVersionId
+        comparedVersionId,
+        userId
       );
       
-      res.json({
+      const comparisonId = uuidv4();
+      
+      res.status(201).json({
         success: true,
-        data: comparison,
+        message: 'Document comparison completed successfully',
+        data: {
+          comparisonId,
+          originalVersionId,
+          comparedVersionId,
+          comparison,
+          comparedAt: new Date(),
+          metadata: {
+            totalChanges: comparison.changes.length,
+            significantChanges: comparison.impactAnalysis.significantChanges.length,
+            overallImpact: comparison.impactAnalysis.overallImpact,
+            riskScoreChange: comparison.impactAnalysis.riskScoreChange,
+          },
+        },
       });
     } catch (error) {
       console.error('Error comparing versions:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to compare versions',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
       });
     }
   }

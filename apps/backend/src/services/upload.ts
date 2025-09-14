@@ -201,6 +201,30 @@ export class UploadService {
       return false;
     }
   }
+
+  /**
+   * Verifies if file exists in storage
+   */
+  async verifyFileExists(filePath: string): Promise<boolean> {
+    try {
+      const [exists] = await this.bucket.file(filePath).exists();
+      return exists;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Gets file metadata
+   */
+  async getFileMetadata(filePath: string): Promise<any> {
+    try {
+      const [metadata] = await this.bucket.file(filePath).getMetadata();
+      return metadata;
+    } catch (error) {
+      throw new Error(`Failed to get file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 }
 
 // Multer configuration for memory storage
