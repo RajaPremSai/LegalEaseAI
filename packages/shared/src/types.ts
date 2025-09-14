@@ -86,3 +86,50 @@ export interface UserSubscription {
   documentsRemaining: number;
   renewsAt: Date;
 }
+
+// Document versioning and comparison types
+export interface DocumentVersion {
+  id: string;
+  documentId: string;
+  versionNumber: number;
+  filename: string;
+  uploadedAt: Date;
+  metadata: DocumentMetadata;
+  analysis?: DocumentAnalysis;
+  parentVersionId?: string;
+}
+
+export interface DocumentComparison {
+  id: string;
+  originalVersionId: string;
+  comparedVersionId: string;
+  comparedAt: Date;
+  changes: DocumentChange[];
+  impactAnalysis: ImpactAnalysis;
+}
+
+export interface DocumentChange {
+  id: string;
+  type: 'addition' | 'deletion' | 'modification';
+  originalText?: string;
+  newText?: string;
+  location: TextLocation;
+  affectedClause?: string;
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+}
+
+export interface ImpactAnalysis {
+  overallImpact: 'favorable' | 'unfavorable' | 'neutral';
+  riskScoreChange: number; // Difference in risk scores
+  significantChanges: SignificantChange[];
+  summary: string;
+}
+
+export interface SignificantChange {
+  changeId: string;
+  category: 'rights' | 'obligations' | 'financial' | 'legal' | 'privacy';
+  impact: 'favorable' | 'unfavorable' | 'neutral';
+  description: string;
+  recommendation?: string;
+}

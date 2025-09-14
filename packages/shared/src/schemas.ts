@@ -138,3 +138,64 @@ export type DocumentAnalysisRequest = z.infer<typeof DocumentAnalysisRequestSche
 export type Question = z.infer<typeof QuestionSchema>;
 export type UserRegistration = z.infer<typeof UserRegistrationSchema>;
 export type UserUpdate = z.infer<typeof UserUpdateSchema>;
+
+// Document versioning and comparison schemas
+export const DocumentVersionSchema = z.object({
+  id: z.string().uuid(),
+  documentId: z.string().uuid(),
+  versionNumber: z.number().min(1),
+  filename: z.string().min(1).max(255),
+  uploadedAt: z.date(),
+  metadata: DocumentMetadataSchema,
+  analysis: DocumentAnalysisSchema.optional(),
+  parentVersionId: z.string().uuid().optional(),
+});
+
+export const DocumentChangeSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(['addition', 'deletion', 'modification']),
+  originalText: z.string().optional(),
+  newText: z.string().optional(),
+  location: TextLocationSchema,
+  affectedClause: z.string().optional(),
+  severity: z.enum(['low', 'medium', 'high']),
+  description: z.string().min(1).max(500),
+});
+
+export const SignificantChangeSchema = z.object({
+  changeId: z.string().uuid(),
+  category: z.enum(['rights', 'obligations', 'financial', 'legal', 'privacy']),
+  impact: z.enum(['favorable', 'unfavorable', 'neutral']),
+  description: z.string().min(1).max(500),
+  recommendation: z.string().max(500).optional(),
+});
+
+export const ImpactAnalysisSchema = z.object({
+  overallImpact: z.enum(['favorable', 'unfavorable', 'neutral']),
+  riskScoreChange: z.number(),
+  significantChanges: z.array(SignificantChangeSchema),
+  summary: z.string().min(1).max(1000),
+});
+
+export const DocumentComparisonSchema = z.object({
+  id: z.string().uuid(),
+  originalVersionId: z.string().uuid(),
+  comparedVersionId: z.string().uuid(),
+  comparedAt: z.date(),
+  changes: z.array(DocumentChangeSchema),
+  impactAnalysis: ImpactAnalysisSchema,
+});
+
+// API request schemas for comparison
+export const DocumentComparisonRequestSchema = z.object({
+  originalVersionId: z.string().uuid(),
+  comparedVersionId: z.string().uuid(),
+});
+
+// Inferred types for versioning and comparison
+export type DocumentVersion = z.infer<typeof DocumentVersionSchema>;
+export type DocumentChange = z.infer<typeof DocumentChangeSchema>;
+export type SignificantChange = z.infer<typeof SignificantChangeSchema>;
+export type ImpactAnalysis = z.infer<typeof ImpactAnalysisSchema>;
+export type DocumentComparison = z.infer<typeof DocumentComparisonSchema>;
+export type DocumentComparisonRequest = z.infer<typeof DocumentComparisonRequestSchema>;

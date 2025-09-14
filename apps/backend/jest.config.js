@@ -25,4 +25,10 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   testTimeout: 30000,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  transformIgnorePatterns: [
+    'node_modules/(?!(uuid)/)'
+  ],
+  moduleNameMapper: {
+    '^uuid$': require.resolve('uuid'),
+  },
 };

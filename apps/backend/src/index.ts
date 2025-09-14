@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import uploadRoutes from './routes/upload';
 import documentRoutes from './routes/documents';
 import qaRoutes from './routes/qa';
+import documentVersionRoutes from './routes/documentVersions';
 
 // Load environment variables
 dotenv.config();
@@ -36,6 +37,9 @@ app.use('/api/documents', documentRoutes);
 
 // Question & Answer routes
 app.use('/api/qa', qaRoutes);
+
+// Document versioning and comparison routes
+app.use('/api/document-versions', documentVersionRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

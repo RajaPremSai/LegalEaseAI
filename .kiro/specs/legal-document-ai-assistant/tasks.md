@@ -118,8 +118,14 @@
   - Write integration tests for Q&A accuracy
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 6. Build document comparison and versioning
-- [ ] 6.1 Create document diff analysis
+- [x] 6. Build document comparison and versioning
+
+
+
+
+- [x] 6.1 Create document diff analysis
+
+
 
   - Implement text comparison algorithms for document versions
   - Build change detection and highlighting system
@@ -127,7 +133,9 @@
   - Write unit tests for diff accuracy
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 6.2 Implement version history management
+- [x] 6.2 Implement version history management
+
+
 
   - Create document version storage and retrieval
   - Build timeline view for document changes
